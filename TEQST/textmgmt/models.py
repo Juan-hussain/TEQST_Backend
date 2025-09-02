@@ -342,24 +342,36 @@ class Text(models.Model):
 
                     # it is not enough to detect the encoding from the first line
                     # it hast to be the entire file content
-                    encoding = chardet.detect(f.read())['encoding']
-                    f.seek(0)
-                    file_content = f.readlines()
-
-                    sentence = ""
+                    raw_data = f.read()
+                    detected_encoding = chardet.detect(raw_data)['encoding']
+                    
+                    # Try UTF-8 first, then fall back to detected encoding
+                    # This ensures Arabic text is properly handled
+                    encodings_to_try = ['utf-8', 'utf-8-sig']
+                    if detected_encoding and detected_encoding.lower() not in ['utf-8', 'utf-8-sig']:
+                        encodings_to_try.append(detected_encoding)
+                    
                     content = []
-                    for l in file_content:
-                        line = l.decode(encoding).strip()
-                        if line == "":
-                            if sentence != "":
-                                content.append(sentence)
-                                sentence = ""
-                        else:
-                            if sentence != "":
-                                sentence += ' '
-                            sentence += line
-                    if sentence != "":
-                        content.append(sentence)
+                    
+                    # Try different encodings until one works
+                    for encoding in encodings_to_try:
+                        try:
+                            # Decode the raw data
+                            decoded_text = raw_data.decode(encoding)
+                            
+                            # Split into sentences (using double newlines as separators)
+                            sentences = decoded_text.split('\n\n')
+                            
+                            for sentence in sentences:
+                                # Clean up the sentence
+                                clean_sentence = sentence.replace('\n', ' ').strip()
+                                if clean_sentence:
+                                    content.append(clean_sentence)
+                            break  # Success, exit the encoding loop
+                        except (UnicodeDecodeError, UnicodeError):
+                            # Reset for next encoding attempt
+                            content = []
+                            continue
 
                 for i in range(len(content)):
                     self.sentences.create(content=content[i], index=i + 1, word_count=content[i].strip().count(' ') + 1)
@@ -505,4 +517,16 @@ class RecentProject(models.Model):
             return
         for f_uuid in settings.DEFAULT_FOLDER:
             folder = Folder.objects.get(root_id=f_uuid)
-            cls.update_folder_for_speaker(speaker, folder)
+            # DEFAULT_FOLDERs should be accessible to all users
+            # Check if it's a SharedFolder and if the speaker has permissions OR if it's a default folder
+            try:
+                shared_folder = SharedFolder.objects.get(id=folder.id)
+                if shared_folder.is_speaker(speaker) or shared_folder.public:
+                    cls.update_folder_for_speaker(speaker, folder)
+                # For DEFAULT_FOLDERs, always add them regardless of speaker permissions
+                # This ensures all users can see default folders
+                elif f_uuid in settings.DEFAULT_FOLDER:
+                    cls.update_folder_for_speaker(speaker, folder)
+            except SharedFolder.DoesNotExist:
+                # Not a SharedFolder, but still a DEFAULT_FOLDER, so add it
+                cls.update_folder_for_speaker(speaker, folder)

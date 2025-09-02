@@ -112,8 +112,25 @@ def parse_file(textfile, separator='\n\n', tknz=False, lang='english'):
     #   handle file type
     else:
         content_bytes: bytes = textfile.read()
-        enc = chardet.detect(content_bytes)['encoding']
-        content_str = content_bytes.decode(enc)
+        detected_enc = chardet.detect(content_bytes)['encoding']
+        
+        # Try UTF-8 first, then fall back to detected encoding
+        # This ensures Arabic text is properly handled
+        encodings_to_try = ['utf-8', 'utf-8-sig']
+        if detected_enc and detected_enc.lower() not in ['utf-8', 'utf-8-sig']:
+            encodings_to_try.append(detected_enc)
+        
+        content_str = None
+        for enc in encodings_to_try:
+            try:
+                content_str = content_bytes.decode(enc)
+                break
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        
+        if content_str is None:
+            # Fallback to utf-8 with error handling
+            content_str = content_bytes.decode('utf-8', errors='replace')
 
         content_str = content_str.replace('\r\n', '\n')
         # Normalize newline characters
