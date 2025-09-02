@@ -501,7 +501,7 @@ class RecentProject(models.Model):
 
     @classmethod
     def add_default_folders_for_speaker(cls, speaker):
-        if not settings.DEFAULT_FOLDER:
+        if not getattr(settings, 'DEFAULT_FOLDER', None):
             return
         for f_uuid in settings.DEFAULT_FOLDER:
             folder = Folder.objects.get(root_id=f_uuid)

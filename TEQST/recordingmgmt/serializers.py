@@ -27,7 +27,7 @@ class TextRecordingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.TextRecording
-        fields = ['id', 'speaker', 'text', 'TTS_permission', 'SR_permission', 'active_sentence', 'sentences_status', 'rec_time_without_rep', 'rec_time_with_rep']
+        fields = ['id', 'speaker', 'text', 'TTS_permission', 'SR_permission', 'active_sentence', 'sentences_status', 'rec_time_without_rep', 'rec_time_with_rep', 'audio_format', 'audio_quality']
         read_only_fields = ['speaker', 'rec_time_without_rep', 'rec_time_with_rep']
 
     def validate(self, data):
@@ -112,9 +112,13 @@ class SentenceRecordingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.SentenceRecording
-        fields = ['recording', 'audiofile', 'index', 'valid']
+        fields = ['recording', 'audiofile', 'index', 'valid', 'audio_format', 'audio_quality']
         read_only_fields = ['valid']
-        extra_kwargs = {'audiofile': {'write_only': True}}
+        extra_kwargs = {
+            'audiofile': {'write_only': True},
+            'audio_format': {'required': False},
+            'audio_quality': {'required': False}
+        }
 
 
 class SentenceRecordingUpdateSerializer(serializers.ModelSerializer):
@@ -130,9 +134,13 @@ class SentenceRecordingUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.SentenceRecording
-        fields = ['recording', 'audiofile', 'index', 'valid']
+        fields = ['recording', 'audiofile', 'index', 'valid', 'audio_format', 'audio_quality']
         read_only_fields = ['recording', 'index', 'valid']
-        extra_kwargs = {'audiofile': {'write_only': True}}
+        extra_kwargs = {
+            'audiofile': {'write_only': True},
+            'audio_format': {'required': False},
+            'audio_quality': {'required': False}
+        }
 
     def validate_audiofile(self, value):
         #print(type(value))

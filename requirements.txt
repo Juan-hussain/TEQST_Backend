@@ -11,3 +11,5 @@ djangorestframework==3.11.2
 pytz==2022.1
 sqlparse==0.4.4
 librosa==0.8.0
+opuslib==3.0.1
+pydub==0.25.1

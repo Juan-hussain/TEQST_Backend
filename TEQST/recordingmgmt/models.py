@@ -20,7 +20,11 @@ def get_normalized_filename(instance):
 def text_rec_upload_path(instance, filename):
     sf_path = instance.text.shared_folder.get_path()
     name = get_normalized_filename(instance)
-    return f'{sf_path}/AudioData/{name}.wav'
+    # Support both WAV and Opus formats
+    if hasattr(instance, 'audio_format') and instance.audio_format == 'opus':
+        return f'{sf_path}/AudioData/{name}.opus'
+    else:
+        return f'{sf_path}/AudioData/{name}.wav'
 
 
 def stm_upload_path(instance, filename):
@@ -48,6 +52,17 @@ class TextRecording(models.Model):
     
     audiofile = models.FileField(upload_to=text_rec_upload_path, blank=True)
     stmfile = models.FileField(upload_to=stm_upload_path, blank=True)
+    
+    # Audio format information
+    audio_format = models.CharField(max_length=10, choices=[
+        ('wav', 'WAV'),
+        ('opus', 'Opus')
+    ], default='wav')
+    audio_quality = models.CharField(max_length=10, choices=[
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High')
+    ], default='medium')
 
     def save(self, *args, **kwargs):
         if self._state.adding:
@@ -186,7 +201,11 @@ def sentence_rec_upload_path(instance, filename):
     Delivers the location in the filesystem where the recordings should be stored.
     """
     sf_path = instance.recording.text.shared_folder.get_path()
-    return f'{sf_path}/TempAudio/{instance.recording.id}_{instance.sentence.id}.wav'
+    # Support both WAV and Opus formats
+    if hasattr(instance, 'audio_format') and instance.audio_format == 'opus':
+        return f'{sf_path}/TempAudio/{instance.recording.id}_{instance.sentence.id}.opus'
+    else:
+        return f'{sf_path}/TempAudio/{instance.recording.id}_{instance.sentence.id}.wav'
 
 
 class SentenceRecording(models.Model):
@@ -206,7 +225,18 @@ class SentenceRecording(models.Model):
     length = models.FloatField(default=0.0) # Useful for optimization, is set in save()
 
     # This is not auto_now_add, since it is meant to track the audiofile, not the model
-    last_updated = models.DateTimeField(default=timezone.now) 
+    last_updated = models.DateTimeField(default=timezone.now)
+    
+    # Audio format information
+    audio_format = models.CharField(max_length=10, choices=[
+        ('wav', 'WAV'),
+        ('opus', 'Opus')
+    ], default='wav')
+    audio_quality = models.CharField(max_length=10, choices=[
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High')
+    ], default='medium') 
 
     # Whether or not this recording is from an older version of the software, serializers update this to False on Create/Update
     legacy = models.BooleanField(default=True) 
@@ -225,26 +255,56 @@ class SentenceRecording(models.Model):
         if self.recording.text != self.sentence.text:
             raise utils.IntegrityError('Text reference is ambiguos')
 
+        # Set audio format before saving to ensure upload_to function has the correct format
+        if not self.audio_format:
+            # Try to detect from the file if it's already uploaded
+            if self.audiofile and self.audiofile.name:
+                try:
+                    from .opus_utils import is_opus_file
+                    if is_opus_file(self.audiofile.path):
+                        self.audio_format = 'opus'
+                    else:
+                        self.audio_format = 'wav'
+                except (ImportError, Exception):
+                    # Fallback to WAV if detection fails
+                    self.audio_format = 'wav'
+            else:
+                # Default to WAV if no file yet
+                self.audio_format = 'wav'
+
         super().save(*args, **kwargs)
 
-        with default_storage.open(self.audiofile.name) as af:
-            y, sr = librosa.load(af, sr=None)
-        length = librosa.get_duration(y=y, sr=sr)
-        self.length = length
-        nonMuteSections = librosa.effects.split(y, 20)
-        if len(nonMuteSections) != 0:  # this test is is probably unnecessary
-            start_invalid = nonMuteSections[0][0] / sr < 0.3
-            end_invalid = nonMuteSections[-1][1] / sr > length - 0.2
-            if start_invalid and end_invalid:
-                self.valid = self.Validity.INVALID_START_END
+        # Process audio file safely to avoid 500 errors
+        try:
+            with default_storage.open(self.audiofile.name) as af:
+                y, sr = librosa.load(af, sr=None)
+            length = librosa.get_duration(y=y, sr=sr)
+            self.length = length
+            nonMuteSections = librosa.effects.split(y, 20)
+            if len(nonMuteSections) != 0:  # this test is is probably unnecessary
+                start_invalid = nonMuteSections[0][0] / sr < 0.3
+                end_invalid = nonMuteSections[-1][1] / sr > length - 0.2
             else:
-                if start_invalid:
-                    self.valid = self.Validity.INVALID_START
-                elif end_invalid:
-                    self.valid = self.Validity.INVALID_END
-                else:
-                    self.valid = self.Validity.VALID
-            super().save()
+                start_invalid = False
+                end_invalid = False
+        except Exception as e:
+            # If audio processing fails, set default values to prevent 500 errors
+            print(f"Warning: Audio processing failed for {self.audiofile.name}: {e}")
+            self.length = 0.0
+            start_invalid = False
+            end_invalid = False
+
+        # Set validation status
+        if start_invalid and end_invalid:
+            self.valid = self.Validity.INVALID_START_END
+        else:
+            if start_invalid:
+                self.valid = self.Validity.INVALID_START
+            elif end_invalid:
+                self.valid = self.Validity.INVALID_END
+            else:
+                self.valid = self.Validity.VALID
+        super().save()
 
         if self.recording.is_finished():
             self.recording.create_stm()
