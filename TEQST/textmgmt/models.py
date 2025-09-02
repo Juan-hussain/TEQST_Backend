@@ -513,20 +513,33 @@ class RecentProject(models.Model):
 
     @classmethod
     def add_default_folders_for_speaker(cls, speaker):
-        if not getattr(settings, 'DEFAULT_FOLDER', None):
-            return
-        for f_uuid in settings.DEFAULT_FOLDER:
-            folder = Folder.objects.get(root_id=f_uuid)
-            # DEFAULT_FOLDERs should be accessible to all users
-            # Check if it's a SharedFolder and if the speaker has permissions OR if it's a default folder
-            try:
-                shared_folder = SharedFolder.objects.get(id=folder.id)
-                if shared_folder.is_speaker(speaker) or shared_folder.public:
+        # Add DEFAULT_FOLDERs (accessible to all users)
+        if getattr(settings, 'DEFAULT_FOLDER', None):
+            for f_uuid in settings.DEFAULT_FOLDER:
+                folder = Folder.objects.get(root_id=f_uuid)
+                # DEFAULT_FOLDERs should be accessible to all users
+                # Check if it's a SharedFolder and if the speaker has permissions OR if it's a default folder
+                try:
+                    shared_folder = SharedFolder.objects.get(id=folder.id)
+                    if shared_folder.is_speaker(speaker) or shared_folder.public:
+                        cls.update_folder_for_speaker(speaker, folder)
+                    # For DEFAULT_FOLDERs, always add them regardless of speaker permissions
+                    # This ensures all users can see default folders
+                    elif f_uuid in settings.DEFAULT_FOLDER:
+                        cls.update_folder_for_speaker(speaker, folder)
+                except SharedFolder.DoesNotExist:
+                    # Not a SharedFolder, but still a DEFAULT_FOLDER, so add it
                     cls.update_folder_for_speaker(speaker, folder)
-                # For DEFAULT_FOLDERs, always add them regardless of speaker permissions
-                # This ensures all users can see default folders
-                elif f_uuid in settings.DEFAULT_FOLDER:
-                    cls.update_folder_for_speaker(speaker, folder)
-            except SharedFolder.DoesNotExist:
-                # Not a SharedFolder, but still a DEFAULT_FOLDER, so add it
-                cls.update_folder_for_speaker(speaker, folder)
+        
+        # Add SharedFolders where the speaker has permissions but no RecentProject entry
+        # This ensures users can see all folders they have access to
+        shared_folders = SharedFolder.objects.filter(speaker=speaker)
+        for shared_folder in shared_folders:
+            if not RecentProject.objects.filter(speaker=speaker, folder=shared_folder).exists():
+                cls.update_folder_for_speaker(speaker, shared_folder)
+        
+        # Add public SharedFolders that the speaker hasn't accessed yet
+        public_folders = SharedFolder.objects.filter(public=True)
+        for public_folder in public_folders:
+            if not RecentProject.objects.filter(speaker=speaker, folder=public_folder).exists():
+                cls.update_folder_for_speaker(speaker, public_folder)
