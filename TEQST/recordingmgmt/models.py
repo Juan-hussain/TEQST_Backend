@@ -280,7 +280,7 @@ class SentenceRecording(models.Model):
                 y, sr = librosa.load(af, sr=None)
             length = librosa.get_duration(y=y, sr=sr)
             self.length = length
-            nonMuteSections = librosa.effects.split(y, 20)
+            nonMuteSections = librosa.effects.split(y, top_db=20)
             if len(nonMuteSections) != 0:  # this test is is probably unnecessary
                 start_invalid = nonMuteSections[0][0] / sr < 0.3
                 end_invalid = nonMuteSections[-1][1] / sr > length - 0.2
