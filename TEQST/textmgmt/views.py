@@ -487,6 +487,8 @@ class LstnSharedFolderStatsView(generics.RetrieveAPIView):
         
         def get_speaker_stats(self, obj):
             user = self.context['request'].user
+            if obj.is_owner(user):
+                return stats.sharedfolder_stats(obj)
             perm_qs = text_permissions.get_listener_permissions(obj, user)
             user_list = text_permissions.get_combined_speakers(perm_qs)
             return stats.sharedfolder_stats(obj, user_filter=user_list)
@@ -513,6 +515,8 @@ class LstnTextStatsView(generics.RetrieveAPIView):
         
         def get_speaker_stats(self, obj):
             user = self.context['request'].user
+            if obj.shared_folder.is_owner(user):
+                return stats.text_stats(obj)
             perm_qs = text_permissions.get_listener_permissions(obj.shared_folder, user)
             user_list = text_permissions.get_combined_speakers(perm_qs)
             return stats.text_stats(obj, user_filter=user_list)
