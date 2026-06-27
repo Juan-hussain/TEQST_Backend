@@ -4,6 +4,7 @@ from django import http
 from django.core.files import base as base_files, uploadedfile
 from django.db.models import Q
 from django.core.files.storage import default_storage
+from django.db import transaction
 from . import models, folderstats, serializers, stats, utils, permissions as text_permissions
 from usermgmt import models as user_models, permissions, serializers as user_serializers
 import calendar, datetime, codecs, pathlib
@@ -25,6 +26,19 @@ def multi_delete_texts(request):
     if result == 0:
         raise exceptions.NotFound('No texts matched your list of ids')
     return response.Response(status=204)
+
+
+@decorators.api_view(['POST'])
+@decorators.permission_classes([rf_permissions.IsAuthenticated, permissions.IsPublisher])
+def multi_rename_texts(request):
+    payload = request.data
+    if isinstance(payload, list):
+        payload = {'items': payload}
+    serializer = serializers.TextBulkRenameSerializer(data=payload, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    with transaction.atomic():
+        texts = serializer.save()
+    return response.Response(serializers.TextBasicSerializer(texts, many=True).data, status=200)
 
 
 class PubFolderListView(generics.ListCreateAPIView):

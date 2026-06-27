@@ -16,6 +16,7 @@ urlpatterns = [
     path('pub/sharedfolders/<int:pk>/speakers/', views.PubSharedFolderSpeakerView.as_view(), name='sharedfolder-speakers'),
     path('pub/sharedfolders/<int:pk>/listeners/', views.PubSharedFolderListenerView.as_view(), name='sharedfolder-listeners'),
     path('pub/texts/<int:pk>/', views.PubTextDetailedView.as_view(), name='pub-text-detail'),
+    path('pub/texts/rename/', views.multi_rename_texts, name='text-rename'),
     path('pub/texts/delete/', views.multi_delete_texts, name='text-delete'),
     path('spk/texts/<int:pk>/', views.SpkTextDetailedView.as_view(), name='spk-text-detail'),
     path('pub/sharedfolders/<int:pk>/download/', views.SpeechDataDownloadView.as_view(), name='download'),

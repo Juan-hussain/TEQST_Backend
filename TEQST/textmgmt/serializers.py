@@ -5,6 +5,7 @@ from usermgmt import models as user_models, serializers as user_serializers
 from recordingmgmt import models as rec_models
 import django.core.files.uploadedfile as uploadedfile
 import chardet, math, uuid
+from django.db import transaction
 
 
 class FolderPKField(serializers.PrimaryKeyRelatedField):
@@ -227,6 +228,63 @@ class TextRenameSerializer(serializers.ModelSerializer):
             )
         return value
 
+
+
+class TextBulkRenameItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField(max_length=100)
+
+
+class TextBulkRenameSerializer(serializers.Serializer):
+    items = TextBulkRenameItemSerializer(many=True)
+
+    def validate_items(self, value):
+        if len(value) == 0:
+            raise serializers.ValidationError("No rename items provided")
+
+        ids = [item['id'] for item in value]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Duplicate text ids are not allowed")
+
+        user = self.context['request'].user
+        texts = list(models.Text.objects.filter(
+            shared_folder__owner=user,
+            id__in=ids,
+        ).select_related('shared_folder'))
+
+        if len(texts) != len(ids):
+            raise serializers.ValidationError(
+                "One or more texts do not exist or do not belong to the current publisher"
+            )
+
+        texts_by_id = {text.id: text for text in texts}
+        folder_updates = {}
+        for item in value:
+            text = texts_by_id[item['id']]
+            folder_updates.setdefault(text.shared_folder_id, {})[text.id] = item['title']
+
+        for folder_id, updates in folder_updates.items():
+            final_titles = set()
+            for text in models.Text.objects.filter(shared_folder_id=folder_id).only('id', 'title'):
+                final_title = updates.get(text.id, text.title)
+                if final_title in final_titles:
+                    raise serializers.ValidationError(
+                        "A text with the given title in the given folder already exists"
+                    )
+                final_titles.add(final_title)
+
+        self._texts_by_id = texts_by_id
+        return value
+
+    def save(self, **kwargs):
+        renamed = []
+        with transaction.atomic():
+            for item in self.validated_data['items']:
+                text = self._texts_by_id[item['id']]
+                text.title = item['title']
+                text.save(update_fields=['title'])
+                renamed.append(text)
+        return renamed
 
 
 class TextProgressSerializer(serializers.ModelSerializer):

@@ -8,6 +8,7 @@ from usermgmt.models import CustomUser
 from recordingmgmt.models import TextRecording, SentenceRecording
 
 import shutil
+import json
 from django.core.files import File
 
 
@@ -895,6 +896,49 @@ class TestPublisherTextDetailedView(TestCase):
         response = self.client.patch(
             reverse("pub-text-detail", args=[t1.pk]),
             data={'title': 'text2'},
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token_1,
+        )
+        self.assertEqual(response.status_code, 400)
+        t1.refresh_from_db()
+        self.assertEqual(t1.title, 'text1')
+
+    def test_pub_text_bulk_rename_correct(self):
+        user1 = get_user(1)
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text1', shared_folder=f1, textfile='test_resources/testtext.txt')
+        t2 = Text.objects.create(title='text2', shared_folder=f1, textfile='test_resources/testtext2.txt')
+        response = self.client.post(
+            reverse("text-rename"),
+            data=json.dumps({
+                'items': [
+                    {'id': t1.pk, 'title': 'text1-renamed'},
+                    {'id': t2.pk, 'title': 'text2-renamed'},
+                ]
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token_1,
+        )
+        self.assertEqual(response.status_code, 200)
+        t1.refresh_from_db()
+        t2.refresh_from_db()
+        self.assertEqual(t1.title, 'text1-renamed')
+        self.assertEqual(t2.title, 'text2-renamed')
+
+    def test_pub_text_bulk_rename_duplicate_title(self):
+        user1 = get_user(1)
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text1', shared_folder=f1, textfile='test_resources/testtext.txt')
+        Text.objects.create(title='text2', shared_folder=f1, textfile='test_resources/testtext2.txt')
+        response = self.client.post(
+            reverse("text-rename"),
+            data=json.dumps({
+                'items': [
+                    {'id': t1.pk, 'title': 'text2'},
+                ]
+            }),
             content_type='application/json',
             HTTP_AUTHORIZATION=self.token_1,
         )
