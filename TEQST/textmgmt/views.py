@@ -120,7 +120,7 @@ class SpkTextListView(generics.RetrieveAPIView):
     permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker | text_permissions.BelowRoot | text_permissions.IsRoot]
 
 
-class PubTextDetailedView(generics.RetrieveDestroyAPIView):
+class PubTextDetailedView(generics.RetrieveUpdateDestroyAPIView):
     """
     url: api/pub/texts/:id/
     use: in publish tab: retrieve a text, text deletion
@@ -133,6 +133,8 @@ class PubTextDetailedView(generics.RetrieveDestroyAPIView):
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return serializers.TextFullSerializer
+        if self.request.method in ['PATCH', 'PUT']:
+            return serializers.TextRenameSerializer
         return serializers.TextBasicSerializer
 
 

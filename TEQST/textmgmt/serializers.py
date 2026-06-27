@@ -210,6 +210,25 @@ class TextBasicSerializer(serializers.ModelSerializer):
         fields = ['id', 'title']
 
 
+class TextRenameSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = models.Text
+        fields = ['id', 'title']
+        read_only_fields = ['id']
+
+    def validate_title(self, value):
+        if models.Text.objects.filter(
+            shared_folder=self.instance.shared_folder,
+            title=value,
+        ).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError(
+                "A text with the given title in the given folder already exists"
+            )
+        return value
+
+
+
 class TextProgressSerializer(serializers.ModelSerializer):
     """
     to be used by view: SpkTextListView

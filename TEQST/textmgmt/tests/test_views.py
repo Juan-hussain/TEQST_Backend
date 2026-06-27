@@ -870,6 +870,52 @@ class TestPublisherTextDetailedView(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+    def test_pub_text_PATCH_correct(self):
+        user1 = get_user(1)
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text', shared_folder=f1, textfile='test_resources/testtext.txt')
+        response = self.client.patch(
+            reverse("pub-text-detail", args=[t1.pk]),
+            data={'title': 'text-renamed'},
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token_1,
+        )
+        self.assertEqual(response.status_code, 200)
+        t1.refresh_from_db()
+        self.assertEqual(t1.pk, response.json()['id'])
+        self.assertEqual(t1.title, 'text-renamed')
+
+    def test_pub_text_PATCH_duplicate_title(self):
+        user1 = get_user(1)
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text1', shared_folder=f1, textfile='test_resources/testtext.txt')
+        Text.objects.create(title='text2', shared_folder=f1, textfile='test_resources/testtext2.txt')
+        response = self.client.patch(
+            reverse("pub-text-detail", args=[t1.pk]),
+            data={'title': 'text2'},
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token_1,
+        )
+        self.assertEqual(response.status_code, 400)
+        t1.refresh_from_db()
+        self.assertEqual(t1.title, 'text1')
+
+    def test_pub_text_PATCH_invalid_text(self):
+        user3 = get_user(3)
+        f1 = Folder.objects.create(name='f1', owner=user3)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text', shared_folder=f1, textfile='test_resources/testtext.txt')
+        response = self.client.patch(
+            reverse("pub-text-detail", args=[t1.pk]),
+            data={'title': 'text-renamed'},
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token_1,
+        )
+        self.assertEqual(response.status_code, 404)
+
+
 class TestSpeakerTextDetailedView(TestCase):
     """
     urls tested:
