@@ -487,6 +487,51 @@ class TestUser(TestCase):
         user = CustomUser.objects.get(username=USER_DATA_CORRECT_1['username'])
         self.assertEqual(user.country, USER_DATA_CORRECT_1['country'])
     
+    def test_user_change_password_success(self):
+        payload = {
+            'current_password': USER_DATA_CORRECT_1['password'],
+            'new_password': 'ChangedPass!2026',
+        }
+        response = self.client.post(
+            reverse("user-change-password"),
+            data=payload,
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        login_data = {
+            'username': USER_DATA_CORRECT_1['username'],
+            'password': 'ChangedPass!2026',
+        }
+        login_response = self.client.post(reverse("login"), data=login_data)
+        self.assertEqual(login_response.status_code, 200)
+
+    def test_user_change_password_wrong_current_password(self):
+        payload = {
+            'current_password': 'wrong-password',
+            'new_password': 'ChangedPass!2026',
+        }
+        response = self.client.post(
+            reverse("user-change-password"),
+            data=payload,
+            content_type='application/json',
+            HTTP_AUTHORIZATION=self.token,
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_user_change_password_requires_auth(self):
+        payload = {
+            'current_password': USER_DATA_CORRECT_1['password'],
+            'new_password': 'ChangedPass!2026',
+        }
+        response = self.client.post(
+            reverse("user-change-password"),
+            data=payload,
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 401)
+
     def test_user_PUT_accent_is_empty_string(self):
         # setup
         put_data = USER_DATA_CORRECT_1.copy()

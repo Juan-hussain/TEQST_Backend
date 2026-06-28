@@ -65,6 +65,17 @@ class UserDetailedView(generics.RetrieveUpdateDestroyAPIView):
         return self.request.user
 
 
+class ChangePasswordView(generics.GenericAPIView):
+    serializer_class = serializers.ChangePasswordSerializer
+    permission_classes = [rf_permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
+
+
 class LanguageListView(generics.ListAPIView):
     '''
     Is used to retrieve a list of all languages
