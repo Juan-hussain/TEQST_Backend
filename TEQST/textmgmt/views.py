@@ -131,7 +131,7 @@ class SpkTextListView(generics.RetrieveAPIView):
     """
     queryset = models.SharedFolder.objects.all()
     serializer_class = serializers.SpkSharedFolderTextSerializer
-    permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker | text_permissions.BelowRoot | text_permissions.IsRoot]
+    permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker, text_permissions.BelowRoot | text_permissions.IsRoot]
 
 
 class PubTextDetailedView(generics.RetrieveUpdateDestroyAPIView):
@@ -159,7 +159,7 @@ class SpkTextDetailedView(generics.RetrieveAPIView):
     """
     queryset = models.Text.objects.all()
     serializer_class = serializers.TextFullSerializer
-    permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker | text_permissions.BelowRoot]
+    permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker, text_permissions.BelowRoot]
 
 
 class SpkPublisherListView(generics.ListAPIView):
@@ -278,7 +278,7 @@ class SpkFolderDetailView(generics.RetrieveAPIView):
 
     queryset = models.Folder.objects.all()
     serializer_class = OutputSerializer
-    permission_classes = [rf_permissions.IsAuthenticated, text_permissions.IsRoot | text_permissions.BelowRoot]
+    permission_classes = [rf_permissions.IsAuthenticated, permissions.IsSpeaker, text_permissions.IsRoot | text_permissions.BelowRoot]
 
     def get_object(self):
         obj = super().get_object()
@@ -313,8 +313,7 @@ class SpkRecentProjectView(generics.ListAPIView):
     serializer_class = OutputSerializer
 
     def get_queryset(self):
-        models.RecentProject.add_default_folders_for_speaker(self.request.user)
-        return self.request.user.recentproject_set.all().order_by('-last_access')
+        return models.RecentProject.get_accessible_for_speaker(self.request.user).order_by('-last_access')
         
 
 class PubListenerPermissionView(generics.ListCreateAPIView):

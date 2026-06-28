@@ -73,6 +73,14 @@ class Folder(models.Model):
             return False
         return self.parent.is_listener(user)
 
+    #Used for permission checks
+    def is_speaker(self, user):
+        if self.is_sharedfolder():
+            return self.sharedfolder.is_speaker(user)
+        if self.parent is None:
+            return False
+        return self.parent.is_speaker(user)
+
     def is_root(self, root):
         return self.root == root
     
@@ -510,6 +518,22 @@ class RecentProject(models.Model):
         obj, _ = cls.objects.get_or_create(speaker=speaker, folder=folder)
         obj.save() # Ensures update of last_access
 
+
+    @classmethod
+    def get_accessible_for_speaker(cls, speaker):
+        cls.add_default_folders_for_speaker(speaker)
+        accessible = []
+        for rp in cls.objects.filter(speaker=speaker).select_related('folder'):
+            folder = rp.folder
+            if getattr(settings, 'DEFAULT_FOLDER', None) and folder.root_id in settings.DEFAULT_FOLDER:
+                accessible.append(rp.id)
+                continue
+            if folder.is_speaker(speaker):
+                accessible.append(rp.id)
+        stale = cls.objects.filter(speaker=speaker).exclude(id__in=accessible)
+        if stale.exists():
+            stale.delete()
+        return cls.objects.filter(id__in=accessible)
 
     @classmethod
     def add_default_folders_for_speaker(cls, speaker):

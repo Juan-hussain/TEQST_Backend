@@ -41,13 +41,12 @@ class TextRecordingSerializer(serializers.ModelSerializer):
         if value.textrecording.filter(speaker=user).exists():
             raise serializers.ValidationError("You already created a recording for this text")
 
-        if not value.is_speaker(user):
-            ser = text_permissions.RootParamSerializer(data=self.context['request'].data)
-            if not ser.is_valid(raise_exception=False):
-                raise serializers.ValidationError("You do not have access to the text you are trying to work on")
-            if not value.is_below_root(ser.validated_data['root']):
-                raise serializers.ValidationError("You do not have access to the text you are trying to work on")
-                
+        ser = text_permissions.RootParamSerializer(data=self.context['request'].data)
+        if not ser.is_valid(raise_exception=False):
+            raise serializers.ValidationError("You do not have access to the text you are trying to work on")
+        if not value.is_below_root(ser.validated_data['root']) or not value.is_speaker(user):
+            raise serializers.ValidationError("You do not have access to the text you are trying to work on")
+
         return value
     
     def get_sentences_status(self, obj):

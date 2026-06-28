@@ -633,6 +633,21 @@ class TestSpeakerTextListView(TestCase):
         response = self.client.get(reverse("sharedfolder-detail", args=[f1.pk]), HTTP_AUTHORIZATION=self.token_2)
         self.assertEqual(response.status_code, 404)
 
+    def test_spk_text_list_removed_speaker_with_old_root_uuid(self):
+        user1 = CustomUser.objects.get(username=USER_DATA_CORRECT_1['username'])
+        user2 = CustomUser.objects.get(username=USER_DATA_CORRECT_2['username'])
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        Text.objects.create(title='test', shared_folder=f1, textfile='test_resources/testtext.txt')
+        f1.speaker.add(user2)
+        root = str(f1.root)
+        f1.speaker.remove(user2)
+        response = self.client.get(
+            reverse("sharedfolder-detail", args=[f1.pk]) + f'?root={root}',
+            HTTP_AUTHORIZATION=self.token_2,
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class TestSharedFolderDetailView(TestCase):
     """
@@ -1040,6 +1055,21 @@ class TestSpeakerTextDetailedView(TestCase):
         t1 = Text.objects.create(title='text', shared_folder=f1, textfile='test_resources/testtext.txt')
         # test
         response = self.client.get(reverse("spk-text-detail", args=[t1.pk]), HTTP_AUTHORIZATION=self.token_2)
+        self.assertEqual(response.status_code, 404)
+
+    def test_spk_text_GET_removed_speaker_with_old_root_uuid(self):
+        user1 = get_user(1)
+        user2 = get_user(2)
+        f1 = Folder.objects.create(name='f1', owner=user1)
+        f1 = f1.make_shared_folder()
+        t1 = Text.objects.create(title='text', shared_folder=f1, textfile='test_resources/testtext.txt')
+        f1.speaker.add(user2)
+        root = str(f1.root)
+        f1.speaker.remove(user2)
+        response = self.client.get(
+            reverse("spk-text-detail", args=[t1.pk]) + f'?root={root}',
+            HTTP_AUTHORIZATION=self.token_2,
+        )
         self.assertEqual(response.status_code, 404)
 
 
