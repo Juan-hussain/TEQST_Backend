@@ -74,6 +74,25 @@ class TestSharedFolderFunctionality(TestCase):
         self.assertEqual(data[0]['folder']['name'], 'test3')
         self.assertEqual(data[0]['folder']['id'], default_folder.id)
 
+    def test_default_folder_detail_access_for_all_users(self):
+        """Test that DEFAULT_FOLDER entries can actually be opened by any user"""
+        default_folder_uuid = uuid.UUID('c92a535e-ef9c-4fa1-81b7-ca27022d636a')
+        shared_folder = SharedFolder.objects.create(
+            name='default_for_all',
+            owner=self.user1,
+            root_id=default_folder_uuid,
+            public=False
+        )
+
+        response = self.client.get(
+            reverse("sharedfolder-detail", kwargs={'pk': shared_folder.id}),
+            {'root': str(default_folder_uuid)},
+            HTTP_AUTHORIZATION=self.token_2
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['name'], 'default_for_all')
+
     def test_recent_folders_public_folder(self):
         """Test that public folders appear in recent folders"""
         # Create a public shared folder

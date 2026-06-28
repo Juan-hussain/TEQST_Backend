@@ -73,8 +73,13 @@ class Folder(models.Model):
             return False
         return self.parent.is_listener(user)
 
+    def is_default_folder(self):
+        return bool(getattr(settings, 'DEFAULT_FOLDER', None)) and self.root_id in settings.DEFAULT_FOLDER
+
     #Used for permission checks
     def is_speaker(self, user):
+        if self.is_default_folder():
+            return True
         if self.is_sharedfolder():
             return self.sharedfolder.is_speaker(user)
         if self.parent is None:
@@ -164,7 +169,7 @@ class SharedFolder(Folder):
 
     #Used for permission checks
     def is_speaker(self, user):
-        return self.public or self.speaker.filter(id=user.id).exists()
+        return self.is_default_folder() or self.public or self.speaker.filter(id=user.id).exists()
         #return True
     
     def make_shared_folder(self):
